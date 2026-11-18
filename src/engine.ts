@@ -1,4 +1,4 @@
-import { initialRoutes, lines, stations, stationById, validStops, type LineId, type Route, type StationId } from './scenario.ts'
+import { initialRoutes, lines, stations, stationById, stationIndex, validStops, type LineId, type Route, type Station, type StationId, type StationIndex } from './scenario.ts'
 
 export const STEP_SECONDS = 1
 export const SEATS = 12
@@ -17,6 +17,7 @@ type Train = {
 }
 export type Simulation = {
   time: number
+  stationById: StationIndex
   queues: Record<StationId, Passenger[]>
   trains: Train[]
   completed: Passenger[]
@@ -30,16 +31,17 @@ function makeTrain(route: Route, stop = 0): Train {
     elapsed: 0, dwell: 2, riders: [] }
 }
 
-export function createSimulation(arrivals: Arrival[], routes = initialRoutes): Simulation {
-  const queues = Object.fromEntries(stations.map(({ id }): [StationId, Passenger[]] => [id, []])) as Simulation['queues']
+export function createSimulation(arrivals: Arrival[], routes = initialRoutes, cityStations: readonly Station[] = stations): Simulation {
+  const queues = Object.fromEntries(cityStations.map(({ id }): [StationId, Passenger[]] => [id, []]))
   return {
-    time: 0, queues, trains: routes.map(route => makeTrain({ ...route, stops: [...route.stops] })),
+    time: 0, stationById: stationIndex(cityStations), queues,
+    trains: routes.map(route => makeTrain({ ...route, stops: [...route.stops] })),
     completed: [], arrivals: [...arrivals].sort((a, b) => a.time - b.time), cursor: 0, generated: 0,
   }
 }
 
 export function requestRoute(sim: Simulation, route: Route) {
-  if (!lines.some(line => line.id === route.id) || !validStops(route.stops)) return false
+  if (!lines.some(line => line.id === route.id) || !validStops(route.stops, sim.stationById)) return false
   const train = sim.trains.find(item => item.route.id === route.id)
   const next = { id: route.id, stops: [...route.stops] }
   if (!train) {
@@ -50,36 +52,36 @@ export function requestRoute(sim: Simulation, route: Route) {
   return true
 }
 
-function travelTime(from: StationId, to: StationId) {
-  const a = stationById[from]
-  const b = stationById[to]
+function travelTime(index: StationIndex, from: StationId, to: StationId) {
+  const a = index[from]
+  const b = index[to]
   return Math.ceil(Math.hypot(a.x - b.x, a.y - b.y) / 24)
 }
 
 type Leg = { line: LineId; exit: StationId; direction: number; cost: number }
 
-function leg(route: Route, from: StationId, to: StationId): Leg | undefined {
+function leg(index: StationIndex, route: Route, from: StationId, to: StationId): Leg | undefined {
   const start = route.stops.indexOf(from)
   const end = route.stops.indexOf(to)
   if (start < 0 || end < 0 || start === end) return
   let cost = 0
-  for (let index = Math.min(start, end); index < Math.max(start, end); index++) {
-    cost += travelTime(route.stops[index], route.stops[index + 1]) + 2
+  for (let stop = Math.min(start, end); stop < Math.max(start, end); stop++) {
+    cost += travelTime(index, route.stops[stop], route.stops[stop + 1]) + 2
   }
   return { line: route.id, exit: to, direction: Math.sign(end - start), cost }
 }
 
-function firstLeg(routes: Route[], from: StationId, to: StationId, transfers: number) {
-  const direct = routes.flatMap(route => leg(route, from, to) ?? []).sort((a, b) => a.cost - b.cost)
+function firstLeg(index: StationIndex, routes: Route[], from: StationId, to: StationId, transfers: number) {
+  const direct = routes.flatMap(route => leg(index, route, from, to) ?? []).sort((a, b) => a.cost - b.cost)
   if (direct.length || transfers >= 1) return direct
   const connecting: Leg[] = []
   for (const route of routes) {
     for (const interchange of route.stops) {
-      const first = leg(route, from, interchange)
+      const first = leg(index, route, from, interchange)
       if (!first) continue
       for (const other of routes) {
         if (route.id === other.id) continue
-        const second = leg(other, interchange, to)
+        const second = leg(index, other, interchange, to)
         if (second) connecting.push({ ...first, cost: first.cost + second.cost })
       }
     }
@@ -88,10 +90,10 @@ function firstLeg(routes: Route[], from: StationId, to: StationId, transfers: nu
   return connecting.slice(0, 1)
 }
 
-export function trainPosition(train: Train) {
-  const from = stationById[train.route.stops[train.stop]]
-  const to = stationById[train.route.stops[train.stop + train.direction]]
-  const progress = train.elapsed / travelTime(from.id, to.id)
+export function trainPosition(train: Train, index = stationById) {
+  const from = index[train.route.stops[train.stop]]
+  const to = index[train.route.stops[train.stop + train.direction]]
+  const progress = train.elapsed / travelTime(index, from.id, to.id)
   return {
     id: train.route.id,
     x: from.x + (to.x - from.x) * progress,
@@ -131,7 +133,7 @@ export function step(sim: Simulation) {
   for (const [index, train] of sim.trains.entries()) {
     if (train.dwell === 0) {
       train.elapsed++
-      const duration = travelTime(train.route.stops[train.stop], train.route.stops[train.stop + train.direction])
+      const duration = travelTime(sim.stationById, train.route.stops[train.stop], train.route.stops[train.stop + train.direction])
       if (train.elapsed < duration) continue
       train.stop += train.direction
       if (train.stop === 0 || train.stop === train.route.stops.length - 1) train.direction *= -1
@@ -154,7 +156,7 @@ export function step(sim: Simulation) {
     const station = train.route.stops[train.stop]
     sim.queues[station] = sim.queues[station].filter(passenger => {
       if (train.riders.length >= SEATS) return true
-      const option = firstLeg(routes, station, passenger.destination, passenger.transfers)
+      const option = firstLeg(sim.stationById, routes, station, passenger.destination, passenger.transfers)
         .find(candidate => candidate.line === train.route.id && candidate.direction === train.direction)
       if (!option) return true
       passenger.rides++

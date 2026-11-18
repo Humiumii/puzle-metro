@@ -4,7 +4,7 @@
 
 Se apagan las luces del Foro del Río y el público sale de golpe. Tienes 2:40 de servicio para llevar a la mayor cantidad de personas a sus destinos. La ciudad y su red de ocho estaciones son ficticias.
 
-![Plano de Puerto Niebla a los 38 segundos, con 72 personas esperando en Foro del Río y una propuesta para extender la L2](docs/diseno/edicion/after-edit-1440.png)
+![Maqueta de Puerto Niebla con la nueva estación Patio de Bruma atendida por la L1](docs/diseno/ciudad/ciudad-1280.png)
 
 ## Cómo jugar
 
@@ -20,6 +20,17 @@ Para reproducir la comparación, juega primero con la red inicial. En otra parti
 | --- | ---: | ---: | ---: | ---: |
 | Red inicial | 23 | 63 | 9 | 49,3 s |
 | L2 extendida al Foro en 00:38 | 43 | 48 | 4 | 47,2 s |
+
+## Maqueta y editor de ciudad
+
+- Cambia entre **Mapa 2D** y **Maqueta 3D** en cualquier momento. En 3D, arrastra para girar, usa la rueda o el gesto de dos dedos para acercar y pulsa **Superior** para ver la ciudad desde arriba. **Seguir tren** muestra la ocupación y la próxima parada de una línea y centra la cámara en 3D.
+- Abre **Editar ciudad** para crear una copia del escenario. Pulsa **Nueva estación**, toca el suelo de la maqueta o un punto del mapa y revisa el marcador de posición. Escribe el nombre y pulsa **Confirmar ubicación**. Puedes renombrar, mover o borrar la estación desde su ficha.
+- Abre **Editar líneas**, elige una línea y agrega la nueva parada desde el mapa o la maqueta. La propuesta numerada aparece antes de pulsar **Aplicar ruta**.
+- En la ficha, configura **Sentido**, **Otra estación** y **Pasajeros**, y pulsa **Asignar demanda**. La demanda editada entra en el segundo 24. Una estación sin conexión puede acumular personas esperando. Para retirar una asignación del mismo par y sentido, guarda una cantidad de cero.
+- **Guardar ciudad** conserva estaciones, líneas y demanda en un espacio de guardado del navegador. La ciudad guardada se abre al recargar y **Jugar ciudad** inicia una simulación nueva. **Escenario original** vuelve al concierto base. **Abrir ciudad guardada** restaura la copia conservada.
+- Al borrar una estación se quita de cada recorrido y se unen sus paradas vecinas. Se elimina cualquier línea que quede con menos de dos paradas y la demanda que use la estación borrada como origen o destino.
+
+[Clip de la estación Patio de Bruma en servicio](docs/diseno/ciudad/estacion-en-servicio.mp4)
 
 ## Motor
 
@@ -41,4 +52,4 @@ npm run build
 npm run preview
 ```
 
-Las pruebas cubren viajes con transbordo, desborde de capacidad, destinos sin conexión y conservación de los pasajeros al editar una línea en movimiento. El workflow de GitHub Actions ejecuta las pruebas y publica el directorio `dist/` desde `main`.
+Las pruebas cubren viajes con transbordo, desborde de capacidad, destinos sin conexión, conservación de pasajeros al editar una línea en movimiento, validación del guardado y simulación con estaciones nuevas. El workflow de GitHub Actions ejecuta las pruebas y publica el directorio `dist/` desde `main`.

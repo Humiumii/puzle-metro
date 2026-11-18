@@ -1,9 +1,10 @@
 import type { CSSProperties } from 'react'
-import { lines, stations, stationById, type LineId, type Route, type StationId } from './scenario.ts'
+import { lines, stationIndex, type LineId, type Route, type Station, type StationId, type StationIndex } from './scenario.ts'
+import type { CityPoint } from './city.ts'
 
 export type Marker = { id: Route['id']; x: number; y: number; angle: number }
 
-function proposedPath(stops: StationId[]) {
+function proposedPath(stops: StationId[], stationById: StationIndex) {
   return stops.slice(1).map((id, index) => {
     const from = stationById[stops[index]]
     const to = stationById[id]
@@ -15,6 +16,7 @@ function proposedPath(stops: StationId[]) {
 }
 
 export type MapProps = {
+  stations: readonly Station[]
   routes: Route[]
   pending: Route[]
   draft: Route | null
@@ -24,10 +26,12 @@ export type MapProps = {
   moving: boolean
   following: LineId | null
   onStation: (id: StationId) => void
+  onGround?: (point: CityPoint) => void
+  previewPoint?: CityPoint
 }
 
 export function StationButton({ station, map }: {
-  station: typeof stations[number]
+  station: Station
   map: Pick<MapProps, 'waiting' | 'draft' | 'routes' | 'selected' | 'onStation'>
 }) {
   const count = map.waiting[station.id] ?? 0
@@ -46,9 +50,14 @@ export function StationButton({ station, map }: {
   </button>
 }
 
-export function MetroMap({ routes, pending, draft, waiting, selected, markers, moving, following, onStation }: MapProps) {
-  const previewPath = draft ? proposedPath(draft.stops) : ''
-  return <div className={`map ${moving ? 'map-moving' : ''}`}>
+export function MetroMap({ stations, routes, pending, draft, waiting, selected, markers, moving, following, onStation, onGround, previewPoint }: MapProps) {
+  const stationById = stationIndex(stations)
+  const previewPath = draft ? proposedPath(draft.stops, stationById) : ''
+  return <div className={`map ${moving ? 'map-moving' : ''} ${onGround ? 'placing' : ''}`} onClick={event => {
+    if (!onGround || (event.target as Element).closest('button')) return
+    const bounds = event.currentTarget.getBoundingClientRect()
+    onGround({ x: 850 * (event.clientX - bounds.left) / bounds.width, y: 488 * (event.clientY - bounds.top) / bounds.height })
+  }}>
       <svg viewBox="0 0 850 488" preserveAspectRatio="none" aria-hidden="true">
         <defs>
           <pattern id="blocks" width="37" height="31" patternTransform="rotate(-14)" patternUnits="userSpaceOnUse">
@@ -72,7 +81,8 @@ export function MetroMap({ routes, pending, draft, waiting, selected, markers, m
           <text x="693" y="423">Reserva del Faro</text>
         </g>
         <g transform="translate(335 69)" className="venue">
-          <path d="M0 26v59" stroke="#8c6149" strokeWidth="2" strokeDasharray="3 5" />
+          {stationById.foro && <path d={`M0 26 L${stationById.foro.x - 335} ${stationById.foro.y - 69}`}
+            stroke="#8c6149" strokeWidth="2" strokeDasharray="3 5" />}
           <path d="M-28-13-15-24h30l13 11v28L15 26h-30l-13-11Z" fill="#fce0ba" stroke="#a2643d" strokeWidth="2" />
           <path d="M-8 10V-9l19-4V6m-19-8 19-4" fill="none" stroke="#663b27" strokeWidth="3" />
           <ellipse cx="-12" cy="10" rx="5" ry="3.5" fill="#663b27" />
@@ -93,7 +103,7 @@ export function MetroMap({ routes, pending, draft, waiting, selected, markers, m
             })}
           </g>
         })}
-        {pending.map(route => <path key={route.id} d={proposedPath(route.stops)} className="rail queued-rail" />)}
+        {pending.map(route => <path key={route.id} d={proposedPath(route.stops, stationById)} className="rail queued-rail" />)}
         {draft && <g className="route-preview" data-line={draft.id}>
           <path d={previewPath} className="rail preview-bed" />
           <path d={previewPath} className="rail preview-rail" />
@@ -106,5 +116,7 @@ export function MetroMap({ routes, pending, draft, waiting, selected, markers, m
       </span>)}
       {stations.map(station => <StationButton key={station.id} station={station}
         map={{ waiting, draft, routes, selected, onStation }} />)}
+      {previewPoint && <span className="placement-marker" aria-hidden="true"
+        style={{ left: previewPoint.x / 8.5 + '%', top: previewPoint.y / 4.88 + '%' }}>+</span>}
   </div>
 }
