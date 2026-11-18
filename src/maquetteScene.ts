@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { MapProps, Marker } from './Map.tsx'
-import { lines, stations, type LineId } from './scenario.ts'
+import { lines, type LineId } from './scenario.ts'
 
 export type CameraAction = 'left' | 'right' | 'closer' | 'farther' | 'top' | 'perspective'
 const ink = '#273e45'
@@ -187,6 +187,30 @@ export function mountMaquette(host: HTMLDivElement, overlay: HTMLDivElement, { g
   const cars = new Map<LineId, THREE.Group>()
   const groundLabels = new THREE.Vector3()
   const shift = new THREE.Vector3()
+  const ray = new THREE.Raycaster()
+  const ground = new THREE.Plane(up, 0)
+  const hit = new THREE.Vector3()
+  let pointer: { id: number; x: number; y: number } | null = null
+  function beginPoint(event: PointerEvent) {
+    if (!event.isPrimary) { pointer = null; return }
+    if (getMap().onGround && event.button === 0)
+      pointer = { id: event.pointerId, x: event.clientX, y: event.clientY }
+  }
+  function endPoint(event: PointerEvent) {
+    if (!pointer || pointer.id !== event.pointerId) return
+    const distance = Math.hypot(pointer.x - event.clientX, pointer.y - event.clientY)
+    pointer = null
+    const onGround = getMap().onGround
+    if (!onGround || distance > 8) return
+    const rect = canvas.getBoundingClientRect()
+    ray.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1,
+      1 - (event.clientY - rect.top) / rect.height * 2), camera)
+    if (ray.ray.intersectPlane(ground, hit)) onGround({ x: hit.x * 100 + 425, y: hit.z * 100 + 244 })
+  }
+  function cancelPoint() { pointer = null }
+  canvas.addEventListener('pointerdown', beginPoint)
+  canvas.addEventListener('pointerup', endPoint)
+  canvas.addEventListener('pointercancel', cancelPoint)
   let width = 1
   let height = 1
   let frame = 0
@@ -213,15 +237,16 @@ export function mountMaquette(host: HTMLDivElement, overlay: HTMLDivElement, { g
   controls.addEventListener('change', () => { dirty = true })
 
   function drawNetwork(map: MapProps) {
-    const signature = JSON.stringify([map.routes, map.draft, map.pending])
+    const signature = JSON.stringify([map.stations, map.routes, map.draft, map.pending])
     if (signature === key) return
     key = signature
     free(network)
-    const byId = new Map(stations.map(station => [station.id, station]))
+    const byId = new Map(map.stations.map(station => [station.id, station]))
     const segments = [...map.routes, ...map.pending, ...(map.draft ? [map.draft] : [])].flatMap(route =>
       route.stops.slice(1).map((id, index) => [byId.get(route.stops[index])!, byId.get(id)!] as const))
     for (const { piece, x, y, clearance } of buildings)
-      piece.visible = !segments.some(([a, b]) => distanceToSegment(x, y, a, b) < clearance)
+      piece.visible = !segments.some(([a, b]) => distanceToSegment(x, y, a, b) < clearance) &&
+        !map.stations.some(station => Math.hypot(station.x - x, station.y - y) < clearance)
     map.routes.forEach((route, index) => {
       const height = .045 + index * .022
       const color = lines.find(line => line.id === route.id)!.color
@@ -248,7 +273,7 @@ export function mountMaquette(host: HTMLDivElement, overlay: HTMLDivElement, { g
           from.clone().lerp(to, (j + .57) / n), .045, '#633d82'))
       })
     }
-    for (const station of stations) {
+    for (const station of map.stations) {
       const platform = disk(.125, .045, '#fff1d4', 12)
       platform.position.copy(point(station.x, station.y, .055))
       network.add(platform)
@@ -343,6 +368,9 @@ export function mountMaquette(host: HTMLDivElement, overlay: HTMLDivElement, { g
       cancelAnimationFrame(frame)
       resize.disconnect()
       canvas.removeEventListener('webglcontextlost', onFailure)
+      canvas.removeEventListener('pointerdown', beginPoint)
+      canvas.removeEventListener('pointerup', endPoint)
+      canvas.removeEventListener('pointercancel', cancelPoint)
       controls.dispose()
       free(scene)
       light.shadow.dispose()

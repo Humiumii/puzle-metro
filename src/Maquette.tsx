@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
 import { StationButton, type MapProps } from './Map.tsx'
-import { lines, stations } from './scenario.ts'
+import { lines } from './scenario.ts'
 import { mountMaquette, type CameraAction } from './maquetteScene.ts'
 
 const cameraButtons: { action: CameraAction; label: string; symbol: string }[] = [
@@ -43,11 +43,13 @@ export default function Maquette({ map, onFailure, stopFollowing }: {
   }
 
   return <div className="maquette">
-    <div className="maquette-stage">
+    <div className={`maquette-stage ${map.onGround ? 'placing' : ''}`}>
       <div className="maquette-render" ref={host} />
       <div className="maquette-labels" ref={labels}>
         <span className="venue-caption" data-x="335" data-y="71" data-h=".4">♫ Foro</span>
-        {stations.map(station => <StationButton key={station.id} station={station} map={map} />)}
+        {map.stations.map(station => <StationButton key={station.id} station={station} map={map} />)}
+        {map.previewPoint && <span className="placement-marker" aria-hidden="true"
+          data-x={map.previewPoint.x} data-y={map.previewPoint.y} data-h=".03">+</span>}
         {map.markers.map(marker => <span key={marker.id} aria-hidden="true" data-train={marker.id}
           data-x={marker.x} data-y={marker.y} data-h=".3"
           className={`maquette-train ${map.following === marker.id ? 'followed' : ''}`}

@@ -510,3 +510,70 @@ button.primary:not(.station) { border-color: #1b5050; background: #1b5050; color
   .camera-deck button { min-height: 39px; min-width: 39px; }
   .maquette-labels .station-name { font-size: .68rem; }
 }
+
+.city-launch, .city-tools {
+  padding: 6px 13px;
+  border-bottom: 1px solid var(--border);
+  background: #f6f1e5;
+}
+.city-launch, .city-tools-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+}
+.city-launch span { margin-right: auto; color: var(--muted); font-size: .78rem; font-weight: 650; }
+.city-launch button, .city-tools button { min-height: 33px; }
+.city-tools p, .city-form p { color: var(--muted); font-size: .79rem; margin-top: 6px; }
+.city-form { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); }
+.city-form h4 { margin: 0 0 7px; font-size: .86rem; }
+.city-fields { display: flex; align-items: end; flex-wrap: wrap; gap: 7px; }
+.city-fields label { display: grid; gap: 3px; color: var(--muted); font-size: .77rem; }
+.city-fields input, .city-fields select {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #9cb2a6;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: .88rem;
+  min-height: 35px;
+}
+.city-fields input[type=number] { width: 76px; }
+.city-demands { margin: 6px 0 0; padding-left: 17px; color: var(--muted); font-size: .78rem; }
+.delete-warning { margin-top: 6px; }
+.placing, .placing canvas { cursor: crosshair; }
+.placing .station { pointer-events: none; }
+.placement-marker {
+  position: absolute;
+  z-index: 4;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border: 2px dashed #633d82;
+  border-radius: 50%;
+  color: #633d82;
+  background: #fffcf1;
+  font-size: 1rem;
+  font-weight: 900;
+  pointer-events: none;
+}
+.city-layout { grid-template-areas: "board console"; }
+@media (max-width: 760px) {
+  .city-layout { grid-template-areas: "board" "console"; }
+  .city-launch, .city-tools { padding-inline: 8px; }
+  .city-tools button { min-height: 39px; }
+  .placement-form {
+    position: fixed;
+    z-index: 6;
+    inset: auto 0 0;
+    margin: 0;
+    padding: 9px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid #bca7cc;
+    background: #f4edf7;
+  }
+  .game:has(.placement-form) { padding-bottom: 154px; }
+}
