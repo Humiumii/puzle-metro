@@ -3,10 +3,14 @@ import { lines, stations, stationById, type Route, type StationId } from './scen
 
 export type Marker = { id: Route['id']; x: number; y: number; angle: number }
 
-function pathFor(stops: StationId[]) {
-  return stops.map((id, index) => {
-    const { x, y } = stationById[id]
-    return (index ? 'L' : 'M') + x + ' ' + y
+function proposedPath(stops: StationId[]) {
+  return stops.slice(1).map((id, index) => {
+    const from = stationById[stops[index]]
+    const to = stationById[id]
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const offset = (dx < 0 ? 12 : -12) / Math.hypot(dx, dy)
+    return `M${from.x - dy * offset} ${from.y + dx * offset} L${to.x - dy * offset} ${to.y + dx * offset}`
   }).join(' ')
 }
 
@@ -20,6 +24,7 @@ export function MetroMap({ routes, pending, draft, waiting, selected, markers, m
   moving: boolean
   onStation: (id: StationId) => void
 }) {
+  const previewPath = draft ? proposedPath(draft.stops) : ''
   return <div className={`map ${moving ? 'map-moving' : ''}`}>
       <svg viewBox="0 0 850 488" preserveAspectRatio="none" aria-hidden="true">
         <defs>
@@ -50,13 +55,26 @@ export function MetroMap({ routes, pending, draft, waiting, selected, markers, m
           <ellipse cx="-12" cy="10" rx="5" ry="3.5" fill="#663b27" />
           <ellipse cx="7" cy="6" rx="5" ry="3.5" fill="#663b27" />
         </g>
-        {routes.map(route => <g key={route.id} opacity={draft?.id === route.id ? .28 : 1}>
-          <path d={pathFor(route.stops)} className="rail-bed" />
-          <path d={pathFor(route.stops)} className="rail" stroke={lines.find(line => line.id === route.id)?.color} />
-        </g>)}
-        {[...pending.filter(route => route.id !== draft?.id), ...(draft ? [draft] : [])].map(route =>
-          <path key={route.id} d={pathFor(route.stops)} className="rail preview-rail" stroke={lines.find(line => line.id === route.id)?.color} />
-        )}
+        {routes.map(route => {
+          const color = lines.find(line => line.id === route.id)?.color
+          return <g key={route.id} className={`active-rail ${draft && draft.id !== route.id ? 'other-rail' : ''}`}>
+            {route.stops.slice(1).map((id, index) => {
+              const from = stationById[route.stops[index]]
+              const to = stationById[id]
+              const segment = { x1: from.x, y1: from.y, x2: to.x, y2: to.y }
+              // Draw each casing immediately under its rail so even a self-crossing reads as an overpass.
+              return <g key={id}>
+                <line {...segment} className="rail-bed" />
+                <line {...segment} className="rail" stroke={color} />
+              </g>
+            })}
+          </g>
+        })}
+        {pending.map(route => <path key={route.id} d={proposedPath(route.stops)} className="rail queued-rail" />)}
+        {draft && <g className="route-preview" data-line={draft.id}>
+          <path d={previewPath} className="rail preview-bed" />
+          <path d={previewPath} className="rail preview-rail" />
+        </g>}
       </svg>
       {markers.map(marker => <span key={marker.id} className="train-marker" aria-hidden="true"
         style={{ '--x': marker.x / 8.5 + '%', '--y': marker.y / 4.88 + '%',
@@ -68,7 +86,7 @@ export function MetroMap({ routes, pending, draft, waiting, selected, markers, m
         const order = draft?.stops.indexOf(station.id) ?? -1
         const interchange = routes.filter(route => route.stops.includes(station.id)).length > 1
         return <button key={station.id}
-          className={`station ${count >= 12 ? 'crowded' : ''} ${interchange ? 'interchange' : ''} ${selected === station.id ? 'selected' : ''}`}
+          className={`station ${count >= 12 ? 'crowded' : ''} ${interchange ? 'interchange' : ''} ${selected === station.id ? 'selected' : ''} ${order >= 0 ? 'proposed-stop' : ''}`}
           data-station={station.id}
           style={{ '--x': station.x / 8.5 + '%', '--y': station.y / 4.88 + '%' } as CSSProperties}
           aria-label={`${station.name}, ${count} en espera${interchange ? ', transbordo' : ''}${order >= 0 ? `, parada ${order + 1}` : ''}`}

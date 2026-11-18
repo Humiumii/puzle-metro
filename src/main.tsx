@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { MetroMap } from './Map.tsx'
+import { Results } from './Results.tsx'
 import { lines, stations, stationById, validStops, type Route, type StationId } from './scenario.ts'
 import { createSimulation, requestRoute, SEATS, stats, step, trainPosition, type Simulation } from './engine.ts'
 import { clock, CONCERT_END, demand, DURATION } from './concert.ts'
@@ -17,23 +18,27 @@ function gameReducer(state: Simulation, action: GameAction) {
   return next
 }
 
-const formatWait = (seconds: number | null) =>
-  seconds === null ? '—' : seconds.toLocaleString('es-CL', { maximumFractionDigits: 1 }) + ' s'
-
 function App() {
   const [sim, dispatch] = useReducer(gameReducer, demand, createSimulation)
-  const [draft, setDraft] = useState<Route | null>(null)
+  const [routeDraft, setDraft] = useState<Route | null>(null)
   const [selected, setSelected] = useState<StationId>('foro')
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(3)
   const [panelOpen, setPanelOpen] = useState(false)
   const [previous, setPrevious] = useState<ReturnType<typeof stats> | null>(null)
+  const resultHeading = useRef<HTMLHeadingElement>(null)
+  const startButton = useRef<HTMLButtonElement>(null)
+  const linePanel = useRef<HTMLDivElement>(null)
+  const mapBoard = useRef<HTMLElement>(null)
+  const replaying = useRef(false)
   const result = stats(sim)
   const finished = sim.time === DURATION
+  const draft = finished ? null : routeDraft
   const routes = sim.trains.map(train => train.pending ?? train.route)
   const pending = sim.trains.flatMap(train => train.pending ?? [])
   const activeRoutes = sim.trains.map(train => train.route)
   const serving = activeRoutes.filter(route => route.stops.includes(selected))
+  const concertLines = activeRoutes.filter(route => route.stops.includes('foro'))
   const available = lines.find(line => !routes.some(route => route.id === line.id))
   const canApply = draft !== null && validStops(draft.stops)
   const waiting = Object.fromEntries(stations.map(({ id }) => [id, sim.queues[id].length]))
@@ -43,13 +48,32 @@ function App() {
     const count = sim.queues[selected].filter(person => person.destination === station.id).length
     return count ? [{ ...station, count }] : []
   }).sort((a, b) => b.count - a.count)
-  const phase = finished ? 'Servicio finalizado' : sim.time >= CONCERT_END ? 'Terminó el concierto' : 'Concierto en curso'
+  const concertEnded = sim.time >= CONCERT_END
 
   useEffect(() => {
     if (!playing || finished) return
     const timer = window.setInterval(() => dispatch({ type: 'step' }), 1000 / speed)
     return () => window.clearInterval(timer)
   }, [playing, finished, speed])
+
+  useEffect(() => {
+    if (finished) resultHeading.current?.focus()
+    if (!finished && replaying.current) {
+      startButton.current?.focus()
+      replaying.current = false
+    }
+  }, [finished])
+
+  function edit(route: Route) {
+    setDraft(route)
+    mapBoard.current?.querySelector<HTMLElement>('.station.selected')?.focus()
+  }
+
+  function manageLines() {
+    setPanelOpen(true)
+    // The content must be visible before its first Edit button can receive focus.
+    requestAnimationFrame(() => linePanel.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus())
+  }
 
   function chooseStation(id: StationId) {
     setSelected(id)
@@ -64,9 +88,10 @@ function App() {
     setDraft(null)
   }
 
-  function restart() {
+  function restart(replay = false) {
     if (finished) setPrevious(result)
-    setPlaying(false)
+    replaying.current = replay
+    setPlaying(replay)
     setDraft(null)
     setSelected('foro')
     setPanelOpen(false)
@@ -86,20 +111,35 @@ function App() {
           <span>Tiempo de servicio</span>
           <strong className="clock">{clock(sim.time)} <small>/ {clock(DURATION)}</small></strong>
         </div>
-        <div className="transport">
-          <button className="primary" disabled={finished} onClick={() => setPlaying(!playing)}>
-            {playing && !finished ? 'Pausar' : sim.time > 0 ? 'Reanudar' : 'Iniciar partida'}
+        {finished ? <span className="service-ended">Servicio finalizado</span> : <div className="transport">
+          <button ref={startButton} className="primary" onClick={() => setPlaying(!playing)}>
+            {playing ? 'Pausar' : sim.time > 0 ? 'Reanudar' : 'Iniciar partida'}
           </button>
-          <button onClick={restart}>Reiniciar</button>
+          <button onClick={() => restart()}>Reiniciar</button>
           <label className="speed">Velocidad <select value={speed} onChange={event => setSpeed(Number(event.target.value))}>
             <option value={1}>1×</option><option value={3}>3×</option><option value={6}>6×</option>
           </select></label>
-        </div>
+        </div>}
         <progress className="timeline" aria-label="Tiempo de servicio" value={sim.time} max={DURATION} />
       </div>
-      <div className="layout">
-        <section className="board">
+      <div className={`layout ${finished ? 'has-result' : ''}`}>
+        <Results result={result} previous={previous} finished={finished} headingRef={resultHeading} onReplay={() => restart(true)} />
+        <section className="board" ref={mapBoard}>
           <div className="bar"><h2>Plano de la red</h2><span>{stations.length} estaciones · {routes.length} líneas</span></div>
+          {!finished && <div className={`mission ${concertEnded ? 'surge' : ''}`}>
+            <div role="status" className="mission-message">
+              {concertEnded
+                ? <strong>Terminó el concierto en Foro del Río</strong>
+                : <><strong>Concierto en curso</strong><p>El público saldrá del Foro del Río en 00:{CONCERT_END}.</p></>}
+            </div>
+            {concertEnded && <div className="surge-data">
+              <strong className="surge-count"><span aria-hidden="true">!</span> {waiting.foro} en espera</strong>
+              {concertLines.map(route => <span key={route.id} className="line-id"
+                style={{ background: lines.find(line => line.id === route.id)?.color }}>{route.id}</span>)}
+              {concertLines.length === 0 && <small>Sin servicio</small>}
+              {!draft && <button onClick={manageLines}>Ajustar líneas</button>}
+            </div>}
+          </div>}
           <MetroMap routes={activeRoutes} pending={pending} draft={draft} waiting={waiting}
             markers={sim.trains.map(trainPosition)} moving={playing && !finished} selected={selected} onStation={chooseStation} />
           <div className="legend">
@@ -108,7 +148,11 @@ function App() {
             <span><i className="key transfer" /> Transbordo</span>
             <span><i className="key congestion" aria-hidden="true">!</i> 12+ en espera</span>
             <span><i className="key train" /> Tren</span>
-            {(draft || pending.length > 0) && <span><i className="key projected" /> Ruta propuesta</span>}
+            {draft && <>
+              {activeRoutes.some(route => route.id === draft.id) && <span><i className="key current" /> {draft.id} actual</span>}
+              <span><i className="key projected" /> {draft.id} propuesta</span>
+            </>}
+            {pending.length > 0 && <span><i className="key queued" /> Cambio pendiente</span>}
           </div>
           <section className="station-info" aria-labelledby="station-title">
             <div className="station-readout">
@@ -120,28 +164,10 @@ function App() {
             {destinations.length > 0 && <ul className="destinations">{destinations.map(station =>
               <li key={station.id}><span>{station.name}</span><b>{station.count}</b></li>)}</ul>}
           </section>
-          <div className={`mission ${sim.time >= CONCERT_END && !finished ? 'surge' : ''}`}>
-            <div role="status"><strong>{phase}</strong>
-              <p>{finished ? 'Reinicia para comparar con otra red y las mismas llegadas.'
-                : sim.time >= CONCERT_END ? 'Revisa los destinos de la cola y ajusta la red para aliviar el Foro.'
-                : `El público empezará a salir a los ${CONCERT_END} segundos de servicio.`}</p>
-            </div>
-            {hotspots.length > 0 && <div className="hotspots">
+          {hotspots.length > 0 && <div className="hotspots">
               <strong>Más espera</strong>
               <ul>{hotspots.map(station => <li key={station.id}>{station.name} <b>{waiting[station.id]}</b></li>)}</ul>
-            </div>}
-          </div>
-        </section>
-        <section className="results" aria-labelledby="results-title">
-            <h2 id="results-title">{finished ? 'Resumen de la partida' : 'Pasajeros'}</h2>
-            <dl>
-              <div><dt>Llegaron</dt><dd>{result.arrived}</dd></div>
-              <div><dt>En espera</dt><dd>{result.waiting}</dd></div>
-              <div><dt>A bordo</dt><dd>{result.aboard}</dd></div>
-              <div><dt>Espera media al llegar</dt><dd>{formatWait(result.averageWait)}</dd></div>
-            </dl>
-            {finished && previous && <p className="comparison">Partida anterior: {previous.arrived} llegaron, {previous.waiting} en espera,
-              {' '}{previous.aboard} a bordo y {formatWait(previous.averageWait)} de espera media.</p>}
+          </div>}
         </section>
         <aside className="console">
           <div className="bar">
@@ -151,29 +177,31 @@ function App() {
               {panelOpen || draft ? 'Ocultar líneas' : 'Gestionar líneas'}
             </button>
           </div>
-          <div id="line-panel" className={`panel ${panelOpen || draft ? 'panel-open' : ''}`}>
+          <div id="line-panel" ref={linePanel} className={`panel ${panelOpen || draft ? 'panel-open' : ''}`}>
             {routes.map(route => {
               const line = lines.find(item => item.id === route.id)!
               const train = sim.trains.find(item => item.route.id === route.id)!
               return <div className="line" key={route.id}>
                 <div className="line-top"><span className="line-id" style={{ background: line.color }}>{line.id}</span><strong>{line.name}</strong>
-                  <button aria-label={`Editar ${line.id}`} disabled={!!draft || finished} onClick={() => setDraft(route)}>Editar</button>
+                  <button aria-label={`Editar ${line.id}`} disabled={!!draft || finished} onClick={() => edit(route)}>Editar</button>
                 </div>
                 <p>{stationById[route.stops[0]].name} ↔ {stationById[route.stops[route.stops.length - 1]].name}</p>
                 <p className="load">{route.stops.length} paradas · {train.riders.length}/{SEATS} a bordo{train.pending ? ' · Cambio en próxima parada' : ''}</p>
               </div>
             })}
-            {(!draft || finished) && <button className="wide" disabled={!available || finished} onClick={() => available && setDraft({ id: available.id, stops: [] })}>+ Nueva línea</button>}
-            {draft && !finished && <div className="editor">
-              <h3>Recorrido de {draft.id}</h3>
-              <p>Elige estaciones en orden. Pulsa una parada marcada para quitarla.</p>
-              {draft.stops.length > 0 && <ol>{draft.stops.map(stop => <li key={stop}>{stationById[stop].name}</li>)}</ol>}
-              <div className="actions">
-                <button disabled={!draft.stops.length} onClick={() => setDraft({ ...draft, stops: [] })}>Vaciar</button>
+            {!draft && !finished && <button className="wide" disabled={!available} onClick={() => available && edit({ id: available.id, stops: [] })}>+ Nueva línea</button>}
+            {draft && <section className="editor" aria-labelledby="editor-title">
+              <h3 id="editor-title">Propuesta {draft.id}</h3>
+              <p>Selecciona estaciones en el plano para añadirlas o quitarlas. Se necesitan al menos dos.</p>
+              {draft.stops.length > 0 && <ol role="list" className="stop-list">{draft.stops.map((stop, index) =>
+                <li key={stop}><b aria-hidden="true">{index + 1}</b>{stationById[stop].name}</li>)}</ol>}
+              <button className="clear-route" disabled={!draft.stops.length} onClick={() => setDraft({ ...draft, stops: [] })}>Vaciar recorrido</button>
+              <div className="actions editor-actions">
+                <strong>{draft.id} <small>{draft.stops.length} paradas</small></strong>
                 <button onClick={() => setDraft(null)}>Cancelar</button>
                 <button className="primary" disabled={!canApply} onClick={apply}>Aplicar ruta</button>
               </div>
-            </div>}
+            </section>}
           </div>
         </aside>
       </div>
