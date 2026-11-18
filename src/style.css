@@ -1,0 +1,53 @@
+:root{font-family:"Aptos",system-ui,sans-serif;color:#163135;background:#f5f5ed;font-synthesis:none}
+*{box-sizing:border-box}
+body{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{opacity:.48;cursor:default}
+button:focus-visible{outline:3px solid #2855ba;outline-offset:3px}
+.wrap{width:min(1320px,calc(100% - 56px));margin:auto}
+.mast{background:#132e30;color:#f0f1df;border-bottom:4px solid #df9950}
+.brand{display:flex;align-items:center;gap:14px;height:62px;font-weight:750}
+.symbol{display:grid;place-items:center;width:39px;height:32px;border:2px solid #df9950;border-radius:16px 5px;font-weight:900;letter-spacing:-.08em;color:#ffd29c}
+.intro{display:flex;justify-content:space-between;align-items:end;gap:16px;margin:24px 0}
+h1,h2,h3,p{margin:0}
+h1{font-family:"Georgia",serif;font-size:clamp(3rem,6vw,5rem);letter-spacing:-.075em;font-weight:700;line-height:1.04}
+.intro p{margin-top:9px;color:#496064}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,325px);gap:18px;align-items:start}
+.board,.console{background:#fffef7;border:1px solid #bbc7ba;border-radius:10px;overflow:hidden}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 17px;border-bottom:1px solid #c5cec1}
+.bar h2{font-size:1rem}
+.bar span,.bar b{font-size:.78rem;color:#456065}
+.map-scroll{overflow-x:auto}
+.map{position:relative;min-width:630px;aspect-ratio:850 / 488;background:#ebeee2}
+.map svg{display:block;width:100%;height:100%}
+.map-label{fill:#59736d;font:700 11px system-ui;letter-spacing:1.2px}
+.rail,.rail-bed{fill:none;stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
+.rail-bed{stroke:#fffef6;stroke-width:11}
+.preview-rail{stroke-dasharray:8 7;stroke-width:8}
+.station{position:absolute;left:var(--x);top:var(--y);translate:-50% -50%;border:0;background:none;width:37px;height:37px;display:grid;place-items:center;padding:0;border-radius:50%}
+.station-dot{display:grid;place-items:center;background:#fffef6;border:2px solid #27484b;width:17px;height:17px;border-radius:50%;font-size:.66rem;font-weight:900;line-height:1}
+.interchange .station-dot{outline:2px solid #27484b;outline-offset:2px}
+.station[aria-pressed=true] .station-dot{background:#15363a;color:white}
+.station:hover .station-dot{scale:1.15}
+.station-name{position:absolute;top:32px;white-space:nowrap;font-size:.75rem;font-weight:850;background:#fffef4ee;padding:2px 5px;border-radius:3px}
+.count{position:absolute;bottom:29px;left:27px;min-width:19px;border-radius:12px;background:#173b3e;color:white;font-size:.68rem;padding:2px 4px;font-weight:800}
+.crowded .station-dot{box-shadow:0 0 0 9px #c944363b;border-color:#9c3029}
+.crowded .count{background:#9c3029}
+.legend{display:flex;flex-wrap:wrap;gap:6px 19px;padding:12px 17px;color:#496064;font-size:.77rem;border-top:1px solid #c5cec1}
+.panel{padding:0 15px 15px}
+.line{padding:12px 0;border-bottom:1px solid #dbe1d6}
+.line-top{display:flex;align-items:center;gap:8px}
+.line-id{padding:4px 7px;border-radius:5px;color:#122527;font-size:.74rem;font-weight:900}
+.line-top button{margin-left:auto}
+.line p,.editor p,.station-info p{font-size:.82rem;line-height:1.45;color:#455e60;margin-top:6px}
+button:not(.station){border:1px solid #adbbb2;border-radius:6px;background:#fffef7;padding:7px 10px;font-size:.83rem;font-weight:740;min-height:34px}
+button:not(.station):hover:not(:disabled){border-color:#153539}
+button.primary{color:#fffdf2;background:#1b4b4d;border-color:#1b4b4d}
+.wide{width:100%;margin-top:12px}
+.editor{background:#ebf0e8;border:1px dashed #7c9691;padding:12px;margin-top:12px;border-radius:6px}
+.editor h3,.station-info h3{font-size:.9rem}
+.editor ol{margin:8px 0;padding-left:22px;font-size:.82rem}
+.actions{display:flex;flex-wrap:wrap;gap:7px}
+.station-info{background:#edf0e7;padding:12px 15px;border-top:1px solid #c5cec1}
+@media(max-width:960px){.layout{grid-template-columns:1fr}}
+@media(max-width:600px){.wrap{width:calc(100% - 24px)}.intro{align-items:start;flex-direction:column;margin:18px 0}.map-scroll{scrollbar-color:#75908a #e2eadd}}
