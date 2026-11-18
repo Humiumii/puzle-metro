@@ -10,8 +10,9 @@ function pathFor(stops: StationId[]) {
   }).join(' ')
 }
 
-export function MetroMap({ routes, draft, waiting, selected, markers, onStation }: {
+export function MetroMap({ routes, pending, draft, waiting, selected, markers, onStation }: {
   routes: Route[]
+  pending: Route[]
   draft: Route | null
   waiting: Partial<Record<StationId, number>>
   selected: StationId
@@ -52,7 +53,9 @@ export function MetroMap({ routes, draft, waiting, selected, markers, onStation 
           <path d={pathFor(route.stops)} className="rail-bed" />
           <path d={pathFor(route.stops)} className="rail" stroke={lines.find(line => line.id === route.id)?.color} />
         </g>)}
-        {draft && <path d={pathFor(draft.stops)} className="rail preview-rail" stroke={lines.find(line => line.id === draft.id)?.color} />}
+        {[...pending.filter(route => route.id !== draft?.id), ...(draft ? [draft] : [])].map(route =>
+          <path key={route.id} d={pathFor(route.stops)} className="rail preview-rail" stroke={lines.find(line => line.id === route.id)?.color} />
+        )}
         {markers.map(marker => <g key={marker.id} transform={`translate(${marker.x} ${marker.y}) rotate(${marker.angle})`}>
           <rect x="-13" y="-7" width="26" height="14" rx="5" fill="#163136" stroke="white" strokeWidth="2" />
           <path d="M-6 0h4m4 0h4" stroke="#fff" strokeWidth="3" />
