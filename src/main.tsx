@@ -1,11 +1,18 @@
 import { createRoot } from 'react-dom/client'
-import { useEffect, useReducer, useRef, useState } from 'react'
-import { MetroMap } from './Map.tsx'
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { MetroMap, type MapProps } from './Map.tsx'
 import { Results } from './Results.tsx'
 import { lines, stations, stationById, validStops, type LineId, type Route, type StationId } from './scenario.ts'
 import { createSimulation, requestRoute, SEATS, stats, step, trainPosition, type Simulation } from './engine.ts'
 import { clock, CONCERT_END, demand, DURATION } from './concert.ts'
 import './style.css'
+
+const Maquette = lazy(() => import('./Maquette.tsx').catch(() => ({
+  default: ({ onFailure }: { onFailure: () => void }) => {
+    useEffect(onFailure, [onFailure])
+    return <></>
+  },
+})))
 
 type GameAction = { type: 'step' | 'reset' } | { type: 'route'; route: Route }
 
@@ -23,6 +30,9 @@ function App() {
   const [routeDraft, setDraft] = useState<Route | null>(null)
   const [selected, setSelected] = useState<StationId>('foro')
   const [following, setFollowing] = useState<LineId | null>(null)
+  const [view, setView] = useState<'2d' | '3d'>('2d')
+  const [sceneFailed, setSceneFailed] = useState(false)
+  const onSceneFailure = useCallback(() => { setSceneFailed(true); setView('2d') }, [])
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(3)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -101,6 +111,11 @@ function App() {
     dispatch({ type: 'reset' })
   }
 
+  const map: MapProps = {
+    routes: activeRoutes, pending, draft, waiting, selected, following,
+    markers: sim.trains.map(trainPosition), moving: playing && !finished, onStation: chooseStation,
+  }
+
   return <>
     <header className="mast">
       <div className="wrap brand">
@@ -128,7 +143,14 @@ function App() {
       <div className={`layout ${finished ? 'has-result' : ''}`}>
         <Results result={result} previous={previous} finished={finished} headingRef={resultHeading} onReplay={() => restart(true)} />
         <section className="board" ref={mapBoard}>
-          <div className="bar exhibit-bar"><h2>Red de Puerto Niebla</h2><span>{stations.length} estaciones · {routes.length} líneas</span></div>
+          <div className="bar exhibit-bar">
+            <h2>Red de Puerto Niebla</h2>
+            <div className="view-picker" aria-label="Vista de la red">
+              <button aria-pressed={view === '2d'} onClick={() => setView('2d')}>Mapa 2D</button>
+              <button aria-pressed={view === '3d'} onClick={() => { setSceneFailed(false); setView('3d') }}>Maqueta 3D</button>
+            </div>
+          </div>
+          {sceneFailed && <p className="scene-message" role="status">No se pudo abrir WebGL. Puedes seguir en el mapa 2D.</p>}
           {!finished && <div className={`mission ${concertEnded ? 'surge' : ''}`}>
             <div role="status" className="mission-message">
               {concertEnded
@@ -143,9 +165,9 @@ function App() {
               {!draft && <button onClick={manageLines}>Ajustar líneas</button>}
             </div>}
           </div>}
-          <MetroMap routes={activeRoutes} pending={pending} draft={draft} waiting={waiting}
-            markers={sim.trains.map(trainPosition)} moving={playing && !finished} selected={selected}
-            following={following} onStation={chooseStation} />
+          {view === '3d' ? <Suspense fallback={<div className="scene-loading" role="status">Abriendo maqueta…</div>}>
+            <Maquette map={map} onFailure={onSceneFailure} stopFollowing={() => setFollowing(null)} />
+          </Suspense> : <MetroMap {...map} />}
           <div className="train-deck" aria-label="Seguimiento de trenes">
             <strong>Seguir tren</strong>
             {sim.trains.map(({route}) => <button key={route.id} aria-label={`Seguir tren ${route.id}`}

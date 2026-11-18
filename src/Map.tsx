@@ -26,6 +26,26 @@ export type MapProps = {
   onStation: (id: StationId) => void
 }
 
+export function StationButton({ station, map }: {
+  station: typeof stations[number]
+  map: Pick<MapProps, 'waiting' | 'draft' | 'routes' | 'selected' | 'onStation'>
+}) {
+  const count = map.waiting[station.id] ?? 0
+  const order = map.draft?.stops.indexOf(station.id) ?? -1
+  const interchange = map.routes.filter(route => route.stops.includes(station.id)).length > 1
+  return <button
+    className={`station ${count >= 12 ? 'crowded' : ''} ${interchange ? 'interchange' : ''} ${map.selected === station.id ? 'selected' : ''} ${order >= 0 ? 'proposed-stop' : ''}`}
+    data-station={station.id} data-x={station.x} data-y={station.y}
+    style={{ '--x': station.x / 8.5 + '%', '--y': station.y / 4.88 + '%' } as CSSProperties}
+    aria-label={`${station.name}, ${count} en espera${interchange ? ', transbordo' : ''}${order >= 0 ? `, parada ${order + 1}` : ''}`}
+    aria-pressed={map.draft ? order >= 0 : map.selected === station.id}
+    onClick={() => map.onStation(station.id)}>
+    <span className="station-dot">{order >= 0 ? order + 1 : ''}</span>
+    {count > 0 && <span className="count" aria-hidden="true">{count >= 12 && <b>!</b>}{count}</span>}
+    <span className="station-name">{station.name}</span>
+  </button>
+}
+
 export function MetroMap({ routes, pending, draft, waiting, selected, markers, moving, following, onStation }: MapProps) {
   const previewPath = draft ? proposedPath(draft.stops) : ''
   return <div className={`map ${moving ? 'map-moving' : ''}`}>
@@ -84,21 +104,7 @@ export function MetroMap({ routes, pending, draft, waiting, selected, markers, m
           '--heading': marker.angle + 'deg', '--line': lines.find(line => line.id === marker.id)?.color } as CSSProperties}>
         <i /><b>{marker.id}</b>
       </span>)}
-      {stations.map(station => {
-        const count = waiting[station.id] ?? 0
-        const order = draft?.stops.indexOf(station.id) ?? -1
-        const interchange = routes.filter(route => route.stops.includes(station.id)).length > 1
-        return <button key={station.id}
-          className={`station ${count >= 12 ? 'crowded' : ''} ${interchange ? 'interchange' : ''} ${selected === station.id ? 'selected' : ''} ${order >= 0 ? 'proposed-stop' : ''}`}
-          data-station={station.id}
-          style={{ '--x': station.x / 8.5 + '%', '--y': station.y / 4.88 + '%' } as CSSProperties}
-          aria-label={`${station.name}, ${count} en espera${interchange ? ', transbordo' : ''}${order >= 0 ? `, parada ${order + 1}` : ''}`}
-          aria-pressed={draft ? order >= 0 : selected === station.id}
-          onClick={() => onStation(station.id)}>
-          <span className="station-dot">{order >= 0 ? order + 1 : ''}</span>
-          {count > 0 && <span className="count" aria-hidden="true">{count >= 12 && <b>!</b>}{count}</span>}
-          <span className="station-name">{station.name}</span>
-        </button>
-      })}
+      {stations.map(station => <StationButton key={station.id} station={station}
+        map={{ waiting, draft, routes, selected, onStation }} />)}
   </div>
 }
