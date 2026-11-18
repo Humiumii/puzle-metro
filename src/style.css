@@ -466,3 +466,47 @@ button.primary:not(.station) { border-color: #1b5050; background: #1b5050; color
   }
   .game:has(.editor) { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 }
+
+.view-picker { display: flex; gap: 4px; }
+.view-picker button { white-space: nowrap; }
+.view-picker button[aria-pressed=true] { background: #2b4e58; border-color: #2b4e58; color: #fffdf4; }
+.scene-message { padding: 8px 12px; font-size: .82rem; background: #f6e4c8; }
+.maquette-stage, .scene-loading {
+  position: relative;
+  height: clamp(390px, 53vh, 625px);
+  overflow: hidden;
+  background: #d9d1bd;
+}
+.scene-loading { display: grid; place-items: center; }
+.maquette-render, .maquette-labels { position: absolute; inset: 0; }
+.maquette-render canvas { display: block; width: 100%; height: 100%; }
+.maquette-labels { pointer-events: none; }
+.maquette-labels [data-x] { position: absolute; visibility: hidden; }
+.maquette-labels .station { pointer-events: auto; }
+.maquette-labels .station-dot { width: 14px; height: 14px; }
+.maquette-labels .proposed-stop .station-dot { width: 21px; height: 21px; }
+.maquette-labels .station-name { top: 30px; }
+.maquette-labels .station[data-station] .station-name { bottom: auto; }
+.maquette-labels .station .count { left: 27px; bottom: 30px; }
+.maquette-train, .venue-caption {
+  transform: translate(-50%, -120%);
+  border-radius: 4px;
+  padding: 2px 5px;
+  background: #263f47;
+  border-bottom: 2px solid var(--line, #c99764);
+  color: #fffdf4;
+  font-size: .68rem;
+  font-weight: 780;
+}
+.maquette-train.followed { z-index: 4; outline: 2px solid #244861; outline-offset: 2px; }
+.venue-caption { background: #fbefd5; color: #714e3a; }
+.camera-deck { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 6px 10px; background: #e2dac6; }
+.camera-deck span { margin-left: auto; color: var(--muted); font-size: .73rem; }
+.camera-deck button { min-width: 34px; }
+@media (max-width: 760px) {
+  .exhibit-bar { flex-wrap: wrap; padding-inline: 8px; }
+  .maquette-stage, .scene-loading { height: clamp(330px, 48svh, 425px); }
+  .camera-deck span { margin-left: 0; width: 100%; }
+  .camera-deck button { min-height: 39px; min-width: 39px; }
+  .maquette-labels .station-name { font-size: .68rem; }
+}
