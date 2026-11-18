@@ -2,7 +2,7 @@ import { createRoot } from 'react-dom/client'
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { MetroMap } from './Map.tsx'
 import { Results } from './Results.tsx'
-import { lines, stations, stationById, validStops, type Route, type StationId } from './scenario.ts'
+import { lines, stations, stationById, validStops, type LineId, type Route, type StationId } from './scenario.ts'
 import { createSimulation, requestRoute, SEATS, stats, step, trainPosition, type Simulation } from './engine.ts'
 import { clock, CONCERT_END, demand, DURATION } from './concert.ts'
 import './style.css'
@@ -22,6 +22,7 @@ function App() {
   const [sim, dispatch] = useReducer(gameReducer, demand, createSimulation)
   const [routeDraft, setDraft] = useState<Route | null>(null)
   const [selected, setSelected] = useState<StationId>('foro')
+  const [following, setFollowing] = useState<LineId | null>(null)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(3)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -32,6 +33,7 @@ function App() {
   const mapBoard = useRef<HTMLElement>(null)
   const replaying = useRef(false)
   const result = stats(sim)
+  const trackedTrain = sim.trains.find(train => train.route.id === following)
   const finished = sim.time === DURATION
   const draft = finished ? null : routeDraft
   const routes = sim.trains.map(train => train.pending ?? train.route)
@@ -94,6 +96,7 @@ function App() {
     setPlaying(replay)
     setDraft(null)
     setSelected('foro')
+    setFollowing(null)
     setPanelOpen(false)
     dispatch({ type: 'reset' })
   }
@@ -125,11 +128,11 @@ function App() {
       <div className={`layout ${finished ? 'has-result' : ''}`}>
         <Results result={result} previous={previous} finished={finished} headingRef={resultHeading} onReplay={() => restart(true)} />
         <section className="board" ref={mapBoard}>
-          <div className="bar"><h2>Plano de la red</h2><span>{stations.length} estaciones · {routes.length} líneas</span></div>
+          <div className="bar exhibit-bar"><h2>Red de Puerto Niebla</h2><span>{stations.length} estaciones · {routes.length} líneas</span></div>
           {!finished && <div className={`mission ${concertEnded ? 'surge' : ''}`}>
             <div role="status" className="mission-message">
               {concertEnded
-                ? <strong>Terminó el concierto en Foro del Río</strong>
+                ? <strong>Salida del concierto · Foro del Río</strong>
                 : <><strong>Concierto en curso</strong><p>El público saldrá del Foro del Río en 00:{CONCERT_END}.</p></>}
             </div>
             {concertEnded && <div className="surge-data">
@@ -141,7 +144,16 @@ function App() {
             </div>}
           </div>}
           <MetroMap routes={activeRoutes} pending={pending} draft={draft} waiting={waiting}
-            markers={sim.trains.map(trainPosition)} moving={playing && !finished} selected={selected} onStation={chooseStation} />
+            markers={sim.trains.map(trainPosition)} moving={playing && !finished} selected={selected}
+            following={following} onStation={chooseStation} />
+          <div className="train-deck" aria-label="Seguimiento de trenes">
+            <strong>Seguir tren</strong>
+            {sim.trains.map(({route}) => <button key={route.id} aria-label={`Seguir tren ${route.id}`}
+              aria-pressed={following === route.id} onClick={() => setFollowing(following === route.id ? null : route.id)}>{route.id}</button>)}
+            {trackedTrain && <span>{trackedTrain.riders.length}/{SEATS} a bordo · Próxima parada:
+              {' '}{stationById[trackedTrain.route.stops[trackedTrain.stop + trackedTrain.direction]].name}</span>}
+            {!draft && !finished && <button className="deck-lines" onClick={manageLines}>Editar líneas</button>}
+          </div>
           <div className="legend">
             <span><i className="key stop" /> Estación</span>
             <span><i className="key picked" /> Selección</span>
@@ -201,6 +213,7 @@ function App() {
                 <button onClick={() => setDraft(null)}>Cancelar</button>
                 <button className="primary" disabled={!canApply} onClick={apply}>Aplicar ruta</button>
               </div>
+              <p className="editor-endpoints">{draft.stops.map(stop => stationById[stop].name).join(' → ') || 'Selecciona la primera parada'}</p>
             </section>}
           </div>
         </aside>
