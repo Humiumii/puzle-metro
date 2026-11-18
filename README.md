@@ -4,13 +4,13 @@
 
 Se apagan las luces del Foro del Río y el público sale de golpe. Tienes 2:40 de servicio para llevar a la mayor cantidad de personas a sus destinos. La ciudad y su red de ocho estaciones son ficticias.
 
-![Mapa del metro de Puerto Niebla a los 38 segundos, con 72 personas esperando en Foro del Río](docs/puerto-niebla.png)
+![Plano de Puerto Niebla a los 38 segundos, con 72 personas esperando en Foro del Río y una propuesta para extender la L2](docs/diseno/edicion/after-edit-1440.png)
 
 ## Cómo jugar
 
 1. Pulsa **Iniciar partida**. El concierto termina en el segundo 18 y la demanda sube en el Foro del Río.
-2. Selecciona una estación para ver su cola por destino. Los círculos rojos marcan estaciones con 12 personas o más en espera.
-3. Pulsa **Editar** o **Nueva línea** y selecciona estaciones en orden. Pulsa una parada marcada para quitarla o **Vaciar** para redibujar la línea. La ruta punteada muestra el borrador hasta que pulses **Aplicar ruta**.
+2. Selecciona una estación para ver las líneas que la sirven y su cola por destino. Las etiquetas con **!** marcan estaciones con 12 personas o más en espera.
+3. Abre **Gestionar líneas** en móvil. Pulsa **Editar** o **Nueva línea** y selecciona estaciones en orden. Pulsa una parada marcada para quitarla o **Vaciar recorrido** para redibujar la línea. El trazado punteado muestra el borrador hasta que pulses **Aplicar ruta**.
 4. Puedes pausar, reanudar o cambiar la velocidad. Al cerrar el servicio verás cuántas personas llegaron, cuántas siguieron en estación o a bordo y cuánto esperaron, en promedio, quienes sí llegaron.
 5. **Reiniciar** recupera la red inicial y repite las mismas llegadas. El siguiente resumen muestra también los resultados de la última partida completa.
 
