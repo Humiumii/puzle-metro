@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { lines, stations, stationById, type Route, type StationId } from './scenario.ts'
+import { lines, stations, stationById, type LineId, type Route, type StationId } from './scenario.ts'
 
 export type Marker = { id: Route['id']; x: number; y: number; angle: number }
 
@@ -14,7 +14,7 @@ function proposedPath(stops: StationId[]) {
   }).join(' ')
 }
 
-export function MetroMap({ routes, pending, draft, waiting, selected, markers, moving, onStation }: {
+export type MapProps = {
   routes: Route[]
   pending: Route[]
   draft: Route | null
@@ -22,8 +22,11 @@ export function MetroMap({ routes, pending, draft, waiting, selected, markers, m
   selected: StationId
   markers: Marker[]
   moving: boolean
+  following: LineId | null
   onStation: (id: StationId) => void
-}) {
+}
+
+export function MetroMap({ routes, pending, draft, waiting, selected, markers, moving, following, onStation }: MapProps) {
   const previewPath = draft ? proposedPath(draft.stops) : ''
   return <div className={`map ${moving ? 'map-moving' : ''}`}>
       <svg viewBox="0 0 850 488" preserveAspectRatio="none" aria-hidden="true">
@@ -76,7 +79,7 @@ export function MetroMap({ routes, pending, draft, waiting, selected, markers, m
           <path d={previewPath} className="rail preview-rail" />
         </g>}
       </svg>
-      {markers.map(marker => <span key={marker.id} className="train-marker" aria-hidden="true"
+      {markers.map(marker => <span key={marker.id} className={`train-marker ${following === marker.id ? 'followed' : ''}`} aria-hidden="true"
         style={{ '--x': marker.x / 8.5 + '%', '--y': marker.y / 4.88 + '%',
           '--heading': marker.angle + 'deg', '--line': lines.find(line => line.id === marker.id)?.color } as CSSProperties}>
         <i /><b>{marker.id}</b>
