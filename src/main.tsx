@@ -26,11 +26,14 @@ function App() {
   const [selected, setSelected] = useState<StationId>('foro')
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(3)
+  const [panelOpen, setPanelOpen] = useState(false)
   const [previous, setPrevious] = useState<ReturnType<typeof stats> | null>(null)
   const result = stats(sim)
   const finished = sim.time === DURATION
   const routes = sim.trains.map(train => train.pending ?? train.route)
   const pending = sim.trains.flatMap(train => train.pending ?? [])
+  const activeRoutes = sim.trains.map(train => train.route)
+  const serving = activeRoutes.filter(route => route.stops.includes(selected))
   const available = lines.find(line => !routes.some(route => route.id === line.id))
   const canApply = draft !== null && validStops(draft.stops)
   const waiting = Object.fromEntries(stations.map(({ id }) => [id, sim.queues[id].length]))
@@ -66,14 +69,23 @@ function App() {
     setPlaying(false)
     setDraft(null)
     setSelected('foro')
+    setPanelOpen(false)
     dispatch({ type: 'reset' })
   }
 
   return <>
-    <header className="mast"><div className="wrap brand"><span className="symbol" aria-hidden="true">PN</span><span>Metro Puerto Niebla</span></div></header>
-    <main className="wrap">
-      <div className="intro">
-        <div><h1>Último bis</h1><p>Cuando termine el concierto, lleva al público del Foro del Río a casa.</p></div>
+    <header className="mast">
+      <div className="wrap brand">
+        <span className="symbol" aria-hidden="true">PN</span>
+        <div><p>Metro Puerto Niebla</p><h1>Último bis</h1></div>
+      </div>
+    </header>
+    <main className="wrap game">
+      <div className="service">
+        <div className="service-time">
+          <span>Tiempo de servicio</span>
+          <strong className="clock">{clock(sim.time)} <small>/ {clock(DURATION)}</small></strong>
+        </div>
         <div className="transport">
           <button className="primary" disabled={finished} onClick={() => setPlaying(!playing)}>
             {playing && !finished ? 'Pausar' : sim.time > 0 ? 'Reanudar' : 'Iniciar partida'}
@@ -83,19 +95,31 @@ function App() {
             <option value={1}>1×</option><option value={3}>3×</option><option value={6}>6×</option>
           </select></label>
         </div>
+        <progress className="timeline" aria-label="Tiempo de servicio" value={sim.time} max={DURATION} />
       </div>
       <div className="layout">
         <section className="board">
-          <div className="bar"><h2>Mapa de la red</h2><span className="clock">{clock(sim.time)} / {clock(DURATION)}</span></div>
-          <progress className="timeline" aria-label="Tiempo de servicio" value={sim.time} max={DURATION} />
-          <MetroMap routes={sim.trains.map(train => train.route)} pending={pending} draft={draft} waiting={waiting}
-            markers={sim.trains.map(trainPosition)} selected={selected} onStation={chooseStation} />
+          <div className="bar"><h2>Plano de la red</h2><span>{stations.length} estaciones · {routes.length} líneas</span></div>
+          <MetroMap routes={activeRoutes} pending={pending} draft={draft} waiting={waiting}
+            markers={sim.trains.map(trainPosition)} moving={playing && !finished} selected={selected} onStation={chooseStation} />
           <div className="legend">
+            <span><i className="key stop" /> Estación</span>
+            <span><i className="key picked" /> Selección</span>
             <span><i className="key transfer" /> Transbordo</span>
-            <span><i className="key train" /> Tren · {SEATS} plazas</span>
-            <span><i className="key congestion" /> 12 o más en espera</span>
-            <span><i className="key projected" /> Ruta propuesta</span>
+            <span><i className="key congestion" aria-hidden="true">!</i> 12+ en espera</span>
+            <span><i className="key train" /> Tren</span>
+            {(draft || pending.length > 0) && <span><i className="key projected" /> Ruta propuesta</span>}
           </div>
+          <section className="station-info" aria-labelledby="station-title">
+            <div className="station-readout">
+              <h3 id="station-title">{stationById[selected].name}</h3>
+              {serving.map(route => <span key={route.id} className="line-id"
+                style={{ background: lines.find(line => line.id === route.id)?.color }}>{route.id}</span>)}
+              <strong className="station-wait">{waiting[selected]} en espera</strong>
+            </div>
+            {destinations.length > 0 && <ul className="destinations">{destinations.map(station =>
+              <li key={station.id}><span>{station.name}</span><b>{station.count}</b></li>)}</ul>}
+          </section>
           <div className={`mission ${sim.time >= CONCERT_END && !finished ? 'surge' : ''}`}>
             <div role="status"><strong>{phase}</strong>
               <p>{finished ? 'Reinicia para comparar con otra red y las mismas llegadas.'
@@ -107,7 +131,8 @@ function App() {
               <ul>{hotspots.map(station => <li key={station.id}>{station.name} <b>{waiting[station.id]}</b></li>)}</ul>
             </div>}
           </div>
-          <section className="results" aria-labelledby="results-title">
+        </section>
+        <section className="results" aria-labelledby="results-title">
             <h2 id="results-title">{finished ? 'Resumen de la partida' : 'Pasajeros'}</h2>
             <dl>
               <div><dt>Llegaron</dt><dd>{result.arrived}</dd></div>
@@ -117,11 +142,16 @@ function App() {
             </dl>
             {finished && previous && <p className="comparison">Partida anterior: {previous.arrived} llegaron, {previous.waiting} en espera,
               {' '}{previous.aboard} a bordo y {formatWait(previous.averageWait)} de espera media.</p>}
-          </section>
         </section>
         <aside className="console">
-          <div className="bar"><h2>Líneas</h2><b>{routes.length}/3</b></div>
-          <div className="panel">
+          <div className="bar">
+            <h2>Líneas <small>{routes.length}/3</small></h2>
+            <button className="panel-toggle" aria-controls="line-panel" aria-expanded={panelOpen || !!draft}
+              disabled={!!draft} onClick={() => setPanelOpen(!panelOpen)}>
+              {panelOpen || draft ? 'Ocultar líneas' : 'Gestionar líneas'}
+            </button>
+          </div>
+          <div id="line-panel" className={`panel ${panelOpen || draft ? 'panel-open' : ''}`}>
             {routes.map(route => {
               const line = lines.find(item => item.id === route.id)!
               const train = sim.trains.find(item => item.route.id === route.id)!
@@ -129,8 +159,8 @@ function App() {
                 <div className="line-top"><span className="line-id" style={{ background: line.color }}>{line.id}</span><strong>{line.name}</strong>
                   <button aria-label={`Editar ${line.id}`} disabled={!!draft || finished} onClick={() => setDraft(route)}>Editar</button>
                 </div>
-                <p>{route.stops.map(stop => stationById[stop].name).join(' → ')}</p>
-                <p className="load">{train.riders.length}/{SEATS} a bordo{train.pending ? ' · Cambio en próxima parada' : ''}</p>
+                <p>{stationById[route.stops[0]].name} ↔ {stationById[route.stops[route.stops.length - 1]].name}</p>
+                <p className="load">{route.stops.length} paradas · {train.riders.length}/{SEATS} a bordo{train.pending ? ' · Cambio en próxima parada' : ''}</p>
               </div>
             })}
             {(!draft || finished) && <button className="wide" disabled={!available || finished} onClick={() => available && setDraft({ id: available.id, stops: [] })}>+ Nueva línea</button>}
@@ -144,13 +174,6 @@ function App() {
                 <button className="primary" disabled={!canApply} onClick={apply}>Aplicar ruta</button>
               </div>
             </div>}
-          </div>
-          <div className="station-info">
-            <h3>{stationById[selected].name}</h3>
-            {selected === 'foro' && <p>Acceso al recinto de conciertos.</p>}
-            <p><strong>{waiting[selected]} en espera</strong></p>
-            {destinations.length > 0 && <ul className="destinations">{destinations.map(station =>
-              <li key={station.id}><span>Hacia {station.name}</span><b>{station.count}</b></li>)}</ul>}
           </div>
         </aside>
       </div>
